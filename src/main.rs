@@ -21,7 +21,11 @@ struct Args {
     model: String,
 
     /// Paths to ignore during search (comma separated)
-    #[arg(long, value_delimiter = ',', default_value = ".git,.gitignore,.vscode,.idea,.vscode-test,target,dist,node_modules,Cargo.lock")]
+    #[arg(
+        long,
+        value_delimiter = ',',
+        default_value = ".git,.gitignore,.vscode,.idea,.vscode-test,target,dist,node_modules,package-lock.json,Cargo.lock"
+    )]
     ignore_paths: Vec<String>,
 }
 
@@ -32,12 +36,12 @@ async fn main() -> Result<()> {
     println!("Initializing LLM Grep with local Ollama model...");
     let llm_grep = LlmGrep::new(&args.model).await?;
 
-    let ignore_paths: Vec<&str> = args.ignore_paths.iter()
-        .map(|s| s.as_str())
-        .collect();
+    let ignore_paths: Vec<&str> = args.ignore_paths.iter().map(|s| s.as_str()).collect();
 
     println!("Searching for: {}", args.query);
-    llm_grep.search_directory(&args.directory, &ignore_paths, &args.query).await?;
+    llm_grep
+        .search_directory(&args.directory, &ignore_paths, &args.query)
+        .await?;
 
     Ok(())
 }

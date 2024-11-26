@@ -32,7 +32,12 @@ impl LlmGrep {
         })
     }
 
-    async fn analyze_content(&self, content: &str, query: &str) -> Result<Option<String>> {
+    async fn analyze_content(
+        &self,
+        path: &Path,
+        content: &str,
+        query: &str,
+    ) -> Result<Option<String>> {
         let system_prompt = "You are a highly accurate semantic search function. Your task is to analyze text and determine if it contains information semantically related to a search query.
 
 Instructions:
@@ -53,11 +58,15 @@ Example response: {\"has_match\": true, \"analysis\": \"Discusses B-tree indexes
 Remember: Be concise, objective, and focus on semantic relevance rather than surface-level matches.";
 
         let prompt = format!(
-            "Text: 
+            "
+            Filename: {}
+            Text: 
             {}\n
             Does the user query '{}' relate to the above text? \
             Respond with a JSON object containing has_match and analysis fields.",
-            content, query
+            path.display(),
+            content,
+            query
         );
         let mut request = GenerationRequest::new(self.model.clone(), prompt);
         request.system = Some(system_prompt.to_string());
@@ -66,7 +75,7 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
         let response = self.ollama.generate(request).await?;
 
         let analysis: AnalysisResponse = serde_json::from_str(&response.response)?;
-        
+
         if !analysis.has_match {
             Ok(None)
         } else {
@@ -74,14 +83,22 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
         }
     }
 
-    pub async fn search_directory(&self, dir: &Path, ignore_paths: &[&str], query: &str) -> Result<()> {
+    pub async fn search_directory(
+        &self,
+        dir: &Path,
+        ignore_paths: &[&str],
+        query: &str,
+    ) -> Result<()> {
         println!("First pass: Recursively collecting and scoring all files...");
 
         let mut try_count = 0;
         let mut candidates = Vec::new();
         // Pass ignore_paths to collect_and_sort_candidates
         while try_count < 3 {
-            candidates = self.sorter.collect_and_sort_candidates(dir, ignore_paths, query).await?;
+            candidates = self
+                .sorter
+                .collect_and_sort_candidates(dir, ignore_paths, query)
+                .await?;
 
             if candidates.is_empty() {
                 println!("No candidates found. Exiting...");
@@ -93,8 +110,15 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
             }
             try_count += 1;
         }
-        println!("Sorted candidates: \n{}", candidates.iter().map(|(path, score)| format!("{} (score: {:.2})", path.display(), score)).collect::<Vec<String>>().join("\n"));
-        
+        println!(
+            "Sorted candidates: \n{}",
+            candidates
+                .iter()
+                .map(|(path, score)| format!("{} (score: {:.2})", path.display(), score))
+                .collect::<Vec<String>>()
+                .join("\n")
+        );
+
         println!("\nSecond pass: analyzing content of promising candidates...");
 
         // Second pass: analyze content of promising candidates
@@ -104,7 +128,11 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
                 Err(_) => continue,
             };
 
-            println!("Analyzing content of {} (filename score: {:.2})", path.display(), score);
+            println!(
+                "Analyzing content of {} (filename score: {:.2})",
+                path.display(),
+                score
+            );
 
             // Convert to string (we know it's valid UTF-8 from pre-filtering)
             let content_str = String::from_utf8_lossy(&content);
@@ -116,7 +144,7 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
                 .chunks(CHUNK_SIZE)
             {
                 let chunk_str: String = chunk.iter().collect();
-                if let Ok(Some(relevance)) = self.analyze_content(&chunk_str, query).await {
+                if let Ok(Some(relevance)) = self.analyze_content(&path, &chunk_str, query).await {
                     println!("{}: {}", path.display(), relevance);
                     break; // Stop processing chunks once we find a match
                 }

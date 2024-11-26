@@ -137,13 +137,7 @@ Output: [{\"filename\":\"main.rs\",\"score\":0.3},{\"filename\":\"auth.rs\",\"sc
 
             let scores = self.analyze_filenames_batch(&batch, query).await?;
 
-            scored_candidates.extend(
-                chunk
-                    .iter()
-                    .cloned()
-                    .zip(scores)
-                    .map(|(path, score)| (path, score)),
-            );
+            scored_candidates.extend(chunk.iter().cloned().zip(scores));
         }
 
         scored_candidates
