@@ -56,17 +56,14 @@ cargo run --release -- "find me the file with the string 'hello'"
 
 ## Usage
 
-Usage: `llmgrep` [OPTIONS] `<QUERY>` [DIRECTORY]
+Usage: `llmgrep` [OPTIONS] `<QUERY>` [DIRECTORY]  
+Arguments:  
+  `<QUERY>`      Search query - what to look for semantically  
+  `[DIRECTORY]`  Directory to search in (default: `.`)  
 
-Arguments:
-  `<QUERY>`      Search query - what to look for semantically
-  `[DIRECTORY]`  Directory to search in (default: `.`)
-
-Options:
-      `--model <MODEL>`                LLM model to use (default: `dolphin-mistral:latest`)
-      `--ignore-paths <IGNORE_PATHS>`  Paths to ignore during search (comma separated) (default: `.git,.gitignore,.vscode,.idea,.vscode-test,target,dist,.gradle,dep,node_modules,package-lock.json,Cargo.lock`)
-  `-v, --verbose`                      Enable verbose output
-  `-h, --help`                         Print help
-  `-V, --version`                      Print version
-
-
+Options:  
+  `--model <MODEL>`                LLM model to use (default: `dolphin-mistral:latest`)  
+  `--ignore-paths <IGNORE_PATHS>`  Paths to ignore during search (comma separated) (default: `.git,.gitignore,.vscode,.idea,.vscode-test,target,dist,.gradle,dep,node_modules,package-lock.json,Cargo.lock`)  
+  `-v, --verbose`                  Enable verbose output  
+  `-h, --help`                     Print help  
+  `-V, --version`                  Print version  
