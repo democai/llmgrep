@@ -24,7 +24,7 @@ struct Args {
     #[arg(
         long,
         value_delimiter = ',',
-        default_value = ".git,.gitignore,.vscode,.idea,.vscode-test,target,dist,node_modules,package-lock.json,Cargo.lock"
+        default_value = ".git,.gitignore,.vscode,.idea,.vscode-test,target,dist,.gradle,dep,node_modules,package-lock.json,Cargo.lock"
     )]
     ignore_paths: Vec<String>,
 

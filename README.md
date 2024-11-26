@@ -20,11 +20,15 @@ LLM Grep is a semantic search tool that uses Ollama's Large Language Models to f
 
 - [Rust](https://rustup.rs/) (latest stable version)
 - [Ollama](https://ollama.ai/) installed and running locally
-- The [Dolphin Mistral](https://ollama.com/models/dolphin-mistral) model pulled in Ollama (`ollama pull dolphin-mistral:latest`)
+- The [Dolphin Mistral](hhttps://ollama.com/library/dolphin-mistral) model pulled in Ollama (`ollama pull dolphin-mistral:latest`)
 
 ## Installation
 
 1. Clone the repository
+
+```sh
+git clone https://github.com/democai/llmgrep.git
+```
 
 2. Navigate to the project directory:
 
@@ -41,11 +45,28 @@ cargo build --release
 4. Run the binary:
 
 ```sh
-cargo run --release -- <directory> "<search query>"
+cargo run --release -- "<search query>"
 ```
 
 ## Example
 
 ```sh
-cargo run --release -- . "find me the file with the string 'hello'"
+cargo run --release -- "find me the file with the string 'hello'"
 ```
+
+## Usage
+
+Usage: `llmgrep` [OPTIONS] `<QUERY>` [DIRECTORY]
+
+Arguments:
+  `<QUERY>`      Search query - what to look for semantically
+  `[DIRECTORY]`  Directory to search in (default: `.`)
+
+Options:
+      `--model <MODEL>`                LLM model to use (default: `dolphin-mistral:latest`)
+      `--ignore-paths <IGNORE_PATHS>`  Paths to ignore during search (comma separated) (default: `.git,.gitignore,.vscode,.idea,.vscode-test,target,dist,.gradle,dep,node_modules,package-lock.json,Cargo.lock`)
+  `-v, --verbose`                      Enable verbose output
+  `-h, --help`                         Print help
+  `-V, --version`                      Print version
+
+
