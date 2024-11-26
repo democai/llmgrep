@@ -27,18 +27,26 @@ struct Args {
         default_value = ".git,.gitignore,.vscode,.idea,.vscode-test,target,dist,node_modules,package-lock.json,Cargo.lock"
     )]
     ignore_paths: Vec<String>,
+
+    /// Enable verbose output
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    println!("Initializing LLM Grep with local Ollama model...");
-    let llm_grep = LlmGrep::new(&args.model).await?;
+    if args.verbose {
+        println!("Initializing LLM Grep with local Ollama model...");
+    }
+    let llm_grep = LlmGrep::new(&args.model, args.verbose).await?;
 
     let ignore_paths: Vec<&str> = args.ignore_paths.iter().map(|s| s.as_str()).collect();
 
-    println!("Searching for: {}", args.query);
+    if args.verbose {
+        println!("Searching for: {}", args.query);
+    }
     llm_grep
         .search_directory(&args.directory, &ignore_paths, &args.query)
         .await?;

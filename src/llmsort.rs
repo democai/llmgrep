@@ -11,6 +11,7 @@ const MAX_FILE_SIZE: u64 = 1024 * 1024; // 1MB
 const BATCH_SIZE: usize = 100;
 const MIN_BINARY_CHECK_SIZE: usize = 1000;
 const BINARY_THRESHOLD: usize = 300; // 30% of MIN_BINARY_CHECK_SIZE
+const MAX_SORT_TRY_COUNT: usize = 3;
 
 #[derive(Debug, Deserialize)]
 struct FileScores {
@@ -26,14 +27,16 @@ struct FileScore {
 pub struct LlmSort {
     ollama: Ollama,
     model: String,
+    verbose: bool,
 }
 
 impl LlmSort {
-    pub async fn new(model: &str) -> Result<Self> {
+    pub async fn new(model: &str, verbose: bool) -> Result<Self> {
         let ollama = Ollama::default();
         Ok(LlmSort {
             ollama,
             model: model.to_string(),
+            verbose,
         })
     }
 
@@ -70,23 +73,26 @@ Output: [{\"filename\":\"main.rs\",\"score\":0.3},{\"filename\":\"auth.rs\",\"sc
 
         let response = self.ollama.generate(request).await?;
 
-        println!("LLM Response: {}", response.response);
-
         let scores: Vec<FileScore> = match serde_json::from_str::<FileScores>(&response.response) {
             Ok(scores) => scores.filenames,
             Err(e) => {
-                eprintln!(
-                    "JSON parsing error: {}. Response was: {}",
-                    e, response.response
-                );
+                if self.verbose {
+                    eprintln!(
+                        "JSON parsing error: {}. Response was: {}",
+                        e,
+                        response.response.trim()
+                    );
+                }
                 // Try parsing again with a different format
                 match serde_json::from_str::<Vec<FileScore>>(&response.response) {
                     Ok(scores) => scores,
                     Err(e2) => {
-                        eprintln!(
-                            "Second JSON parsing error: {}. Response was: {}",
-                            e2, response.response
-                        );
+                        if self.verbose {
+                            eprintln!(
+                                "Second JSON parsing error: {}. Response was: {}",
+                                e2, response.response
+                            );
+                        }
                         Vec::new()
                     }
                 }
@@ -100,13 +106,7 @@ Output: [{\"filename\":\"main.rs\",\"score\":0.3},{\"filename\":\"auth.rs\",\"sc
                 scores
                     .iter()
                     .find(|score| score.filename == *name)
-                    .map_or_else(
-                        || {
-                            eprintln!("No score found for filename: {}", name);
-                            0.0
-                        },
-                        |score| score.score,
-                    )
+                    .map_or_else(|| 0.0, |score| score.score)
             })
             .collect();
 
@@ -143,6 +143,32 @@ Output: [{\"filename\":\"main.rs\",\"score\":0.3},{\"filename\":\"auth.rs\",\"sc
         scored_candidates
             .sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
         Ok(scored_candidates)
+    }
+
+    pub async fn collect_sort_with_retry(
+        &self,
+        dir: &Path,
+        ignore_paths: &[&str],
+        query: &str,
+    ) -> Result<Vec<(PathBuf, f32)>> {
+        let mut try_count = 0;
+        while try_count < MAX_SORT_TRY_COUNT {
+            let candidates = self
+                .collect_and_sort_candidates(dir, ignore_paths, query)
+                .await?;
+
+            if candidates.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            if candidates.iter().any(|(_, score)| *score > 0.0) {
+                return Ok(candidates);
+            }
+            try_count += 1;
+        }
+
+        // If we get here, we failed to find any promising candidates
+        Ok(Vec::new())
     }
 
     fn is_binary_file(content: &[u8]) -> bool {

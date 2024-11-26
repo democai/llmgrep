@@ -19,16 +19,18 @@ pub struct LlmGrep {
     ollama: Ollama,
     model: String,
     sorter: LlmSort,
+    verbose: bool,
 }
 
 impl LlmGrep {
-    pub async fn new(model: &str) -> Result<Self> {
+    pub async fn new(model: &str, verbose: bool) -> Result<Self> {
         let ollama = Ollama::default();
-        let sorter = LlmSort::new(model).await?;
+        let sorter = LlmSort::new(model, verbose).await?;
         Ok(LlmGrep {
             ollama,
             model: model.to_string(),
             sorter,
+            verbose,
         })
     }
 
@@ -89,27 +91,20 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
         ignore_paths: &[&str],
         query: &str,
     ) -> Result<()> {
-        println!("First pass: Recursively collecting and scoring all files...");
-
-        let mut try_count = 0;
-        let mut candidates = Vec::new();
-        // Pass ignore_paths to collect_and_sort_candidates
-        while try_count < 3 {
-            candidates = self
-                .sorter
-                .collect_and_sort_candidates(dir, ignore_paths, query)
-                .await?;
-
-            if candidates.is_empty() {
-                println!("No candidates found. Exiting...");
-                return Ok(());
-            }
-
-            if candidates.iter().any(|(_, score)| *score > 0.0) {
-                break;
-            }
-            try_count += 1;
+        if self.verbose {
+            println!("First pass: Recursively collecting and scoring all files...");
         }
+
+        let candidates = self
+            .sorter
+            .collect_sort_with_retry(dir, ignore_paths, query)
+            .await?;
+
+        if candidates.is_empty() {
+            println!("No candidates found. Exiting...");
+            return Ok(());
+        }
+
         println!(
             "Sorted candidates: \n{}",
             candidates
@@ -119,7 +114,9 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
                 .join("\n")
         );
 
-        println!("\nSecond pass: analyzing content of promising candidates...");
+        if self.verbose {
+            println!("\nSecond pass: analyzing content of promising candidates...");
+        }
 
         // Second pass: analyze content of promising candidates
         for (path, score) in candidates {
@@ -128,11 +125,13 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
                 Err(_) => continue,
             };
 
-            println!(
-                "Analyzing content of {} (filename score: {:.2})",
-                path.display(),
-                score
-            );
+            if self.verbose {
+                println!(
+                    "Analyzing content of {} (filename score: {:.2})",
+                    path.display(),
+                    score
+                );
+            }
 
             // Convert to string (we know it's valid UTF-8 from pre-filtering)
             let content_str = String::from_utf8_lossy(&content);
@@ -145,6 +144,7 @@ Remember: Be concise, objective, and focus on semantic relevance rather than sur
             {
                 let chunk_str: String = chunk.iter().collect();
                 if let Ok(Some(relevance)) = self.analyze_content(&path, &chunk_str, query).await {
+                    // Output the final results
                     println!("{}: {}", path.display(), relevance);
                     break; // Stop processing chunks once we find a match
                 }
